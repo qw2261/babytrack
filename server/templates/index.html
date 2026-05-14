@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>BabyTrack</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+<div id="app" v-cloak>
+  {% raw %}
+  <div class="header">
+    <div class="header-top">
+      <div class="baby-name" @click="showNameEdit = true">
+        {{ babyName }}<span class="baby-name-edit"> ✎</span>
+      </div>
+      <div class="header-actions">
+        <span class="today-label" @click="goToday">今</span>
+      </div>
+    </div>
+    <div class="week-row">
+      <div
+        v-for="d in weekDates"
+        :key="d.dateStr"
+        class="date-item"
+        :class="{ active: d.dateStr === selectedDate }"
+        @click="selectDate(d.dateStr)"
+      >
+        <div class="date-weekday">{{ d.weekday }}</div>
+        <div class="date-day">{{ d.day }}</div>
+      </div>
+      <div class="date-month-label">{{ monthDayLabel }}</div>
+    </div>
+  </div>
+
+  <div class="summary-bar" v-if="summary">
+    <div class="summary-item" v-if="summary.feed && summary.feed.count > 0">
+      <span class="label">喂奶</span>
+      <span class="value">{{ summary.feed.count }}次 {{ summary.feed.total_ml }}ml</span>
+    </div>
+    <div class="summary-item" v-if="summary.diaper && summary.diaper.count > 0">
+      <span class="label">尿布</span>
+      <span class="value">{{ summary.diaper.count }}次</span>
+    </div>
+    <div class="summary-item" v-if="summary.vitamin && summary.vitamin.taken">
+      <span class="label">维生素AD</span>
+      <span class="value">✓</span>
+    </div>
+    <div class="summary-item" v-if="summary.sleep && summary.sleep.count > 0">
+      <span class="label">睡眠</span>
+      <span class="value">{{ summary.sleep.count }}次</span>
+    </div>
+    <div class="summary-item" v-if="summary.bath && summary.bath.count > 0">
+      <span class="label">洗澡</span>
+      <span class="value">{{ summary.bath.count }}次</span>
+    </div>
+    <div class="summary-item" v-if="summary.food && summary.food.count > 0">
+      <span class="label">辅食</span>
+      <span class="value">{{ summary.food.count }}次</span>
+    </div>
+    <div class="summary-item" v-if="summary.temperature && summary.temperature.count > 0">
+      <span class="label">体温</span>
+      <span class="value">{{ summary.temperature.count }}次</span>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div v-if="events.length === 0" class="empty-state">
+      <div class="empty-icon">📝</div>
+      <div class="empty-text">今天还没有记录</div>
+      <div class="empty-sub">点击下方按钮开始记录吧</div>
+    </div>
+    <div
+      v-for="event in events"
+      :key="event.id"
+      class="event-card"
+      :class="{ 'sleep-ongoing': isOngoing(event), 'bath-ongoing': isOngoing(event) && event.type === 'bath' }"
+      @click="openEdit(event)"
+    >
+      <div class="event-header">
+        <div class="event-header-left">
+          <span class="event-dot" :style="{ background: typeColor(event.type) }"></span>
+          <span class="event-time">{{ formatTime(event.start_time) }}</span>
+          <span v-if="isOngoing(event)" class="ongoing-badge">{{ ongoingLabel(event) }}</span>
+        </div>
+        <div class="event-header-right">
+          <span class="event-ago">{{ timeAgo(event.start_time) }}</span>
+          <button class="btn-delete" @click.stop="confirmDelete(event)">×</button>
+        </div>
+      </div>
+      <div class="event-body">
+        <span class="event-type-label">{{ typeLabel(event.type) }}</span>
+        <span class="event-detail">{{ eventDetail(event) }}</span>
+      </div>
+      <div v-if="isOngoing(event)" class="event-actions">
+        <button class="btn-end-sleep" @click.stop="endOngoing(event)">记录睡醒</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-actions">
+    <div class="action-btn" @click="openModal('feed')">
+      <div class="action-icon" style="background: #fde8f0; color: #e87c9e;">🍼</div>
+      <div class="action-label">喂奶</div>
+    </div>
+    <div class="action-btn" @click="handleSleep">
+      <div class="action-icon" style="background: #e8f0fd; color: #7eb8e0;">💤</div>
+      <div class="action-label">睡觉</div>
+    </div>
+    <div class="action-btn" @click="openModal('diaper')">
+      <div class="action-icon" style="background: #e8f8fd; color: #a0d4a0;">🧷</div>
+      <div class="action-label">尿布</div>
+    </div>
+    <div class="action-btn" @click="handleVitamin">
+      <div class="action-icon" style="background: #fdf0e8; color: #e8c86e;">💊</div>
+      <div class="action-label">维生素</div>
+    </div>
+    <div class="action-btn" @click="showMorePanel = !showMorePanel">
+      <div class="action-icon" style="background: #f5f0f8; color: #b8a0c8;">＋</div>
+      <div class="action-label">更多</div>
+    </div>
+  </div>
+
+  <div v-if="showMorePanel" class="more-panel" @click.self="showMorePanel = false">
+    <div class="more-panel-inner">
+      <div class="more-grid">
+        <div class="more-item" @click="handleBath">
+          <div class="action-icon" style="background: #e8f4fd; color: #88c8e8;">🛁</div>
+          <div class="action-label">洗澡</div>
+        </div>
+        <div class="more-item" @click="openModal('food')">
+          <div class="action-icon" style="background: #fdf4e8; color: #f0a860;">🍜</div>
+          <div class="action-label">辅食</div>
+        </div>
+        <div class="more-item" @click="openModal('checkup')">
+          <div class="action-icon" style="background: #f0e8fd; color: #b088d0;">🏥</div>
+          <div class="action-label">体检</div>
+        </div>
+        <div class="more-item" @click="openModal('temperature')">
+          <div class="action-icon" style="background: #fde8e8; color: #e06060;">🌡️</div>
+          <div class="action-label">体温</div>
+        </div>
+      </div>
+      <button class="more-cancel" @click="showMorePanel = false">取消</button>
+    </div>
+  </div>
+
+  <div v-if="modal" class="modal-overlay" @click.self="closeModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">{{ modalTitle }}</h3>
+        <button class="modal-close" @click="closeModal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">开始时间</label>
+          <wheel-picker v-model="form.start_time" :min-date="minDate" :max-date="maxDate"></wheel-picker>
+        </div>
+
+        <div v-if="(modal === 'edit' && (form.type === 'sleep' || form.type === 'bath')) || modal === 'start'" class="form-group">
+          <label class="form-label">结束时间</label>
+          <div v-if="!showEndPicker" class="end-time-placeholder" @click="showEndPicker = true">
+            {{ form.end_time ? formatDateTime(form.end_time) : '熟睡中（点击设置结束时间）' }}
+          </div>
+          <div v-else>
+            <wheel-picker v-model="form.end_time" :min-date="minDate" :max-date="maxDate"></wheel-picker>
+            <button v-if="form.end_time" class="btn-clear-end" @click="form.end_time = ''; showEndPicker = false">清除（恢复进行中）</button>
+          </div>
+        </div>
+
+        <div v-if="modal === 'feed' || modal === 'edit' && (form.type === 'feed' || form.type === 'food')" class="form-group">
+          <label class="form-label">量级 (ml)</label>
+          <div class="amount-btns">
+            <button
+              v-for="a in quickAmounts"
+              :key="a"
+              class="amount-btn"
+              :class="{ active: form.amount === a }"
+              @click="form.amount = a"
+            >{{ a }}ml</button>
+            <input
+              class="amount-input"
+              type="number"
+              v-model.number="form.amount"
+              placeholder="自定义"
+              inputmode="numeric"
+            >
+          </div>
+        </div>
+
+        <div v-if="modal === 'temperature' || (modal === 'edit' && form.type === 'temperature')" class="form-group">
+          <label class="form-label">体温 (°C)</label>
+          <div class="temp-input-wrap">
+            <input
+              class="temp-input"
+              type="number"
+              v-model.number="tempDisplay"
+              placeholder="36.5"
+              step="0.1"
+              min="35.0"
+              max="42.0"
+              inputmode="decimal"
+            >
+            <span class="temp-unit">°C</span>
+          </div>
+        </div>
+
+        <div v-if="modal === 'diaper' || (modal === 'edit' && form.type === 'diaper')" class="form-group">
+          <label class="form-label">类型</label>
+          <div class="diaper-types">
+            <button
+              class="diaper-type-btn"
+              :class="{ active: form.sub_type === 'pee' }"
+              @click="form.sub_type = 'pee'"
+            >嘘嘘</button>
+            <button
+              class="diaper-type-btn"
+              :class="{ active: form.sub_type === 'poop' }"
+              @click="form.sub_type = 'poop'"
+            >便便</button>
+          </div>
+        </div>
+
+        <div v-if="modal === 'diaper' || (modal === 'edit' && form.type === 'diaper')" class="form-group">
+          <label class="form-label">颜色</label>
+          <div class="color-options">
+            <span
+              v-for="c in diaperColors"
+              :key="c.value"
+              class="color-dot"
+              :class="{ active: form.color === c.value }"
+              :style="{ background: c.hex }"
+              @click="form.color = c.value"
+            ></span>
+          </div>
+        </div>
+
+        <div v-if="modal === 'food' || modal === 'checkup' || (modal === 'edit' && (form.type === 'food' || form.type === 'checkup'))" class="form-group">
+          <label class="form-label">备注</label>
+          <input
+            class="note-input"
+            v-model="form.note"
+            :placeholder="form.type === 'food' ? '如：米糊、果泥' : '如：身高体重'"
+          >
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" @click="closeModal">取消</button>
+        <button class="btn-submit" @click="submitForm">{{ submitLabel }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="confirm.show" class="confirm-overlay" @click.self="confirmReject">
+    <div class="confirm-card">
+      <div class="confirm-icon">{{ confirm.icon }}</div>
+      <div class="confirm-title">{{ confirm.title }}</div>
+      <div class="confirm-desc">{{ confirm.desc }}</div>
+      <div class="confirm-actions">
+        <button class="btn-confirm-cancel" @click="confirmReject">取消</button>
+        <button class="btn-danger" @click="confirmResolve">{{ confirm.okText }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showNameEdit" class="modal-overlay" @click.self="saveBabyName">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">宝宝昵称</h3>
+        <button class="modal-close" @click="saveBabyName">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <input
+            class="note-input"
+            v-model="babyNameInput"
+            placeholder="输入宝宝昵称"
+            ref="nameInput"
+            @keyup.enter="saveBabyName"
+          >
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" @click="saveBabyName">取消</button>
+        <button class="btn-submit" @click="saveBabyName">保存</button>
+      </div>
+    </div>
+  </div>
+  {% endraw %}
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="/static/js/app.js?v=2"></script>
+</body>
+</html>
