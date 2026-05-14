@@ -36,6 +36,14 @@ sudo systemctl daemon-reload
 sudo systemctl enable babytrack
 sudo systemctl restart babytrack
 
+# ---- 定时自动更新（每 5 分钟） -----------------------------
+CRON_JOB="*/5 * * * * cd $BASE_DIR && bash deploy.sh >> /tmp/babytrack-deploy.log 2>&1"
+if ! crontab -l 2>/dev/null | grep -qF "bash deploy.sh"; then
+  (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+  echo ""
+  echo ">> 已添加定时更新任务（每 5 分钟自动 git pull + 重启）"
+fi
+
 echo ""
 echo "=== 局域网访问 ==="
 echo "http://babytrack.local:5000"
@@ -43,4 +51,4 @@ echo "http://$(hostname -I | awk '{print $1}'):5000"
 echo ""
 echo "=== 部署完成 ==="
 echo "局域网内手机浏览器打开以上地址即可使用。"
-echo "如需外网访问，可自行配置 frp / ngrok / cloudflared 等内网穿透工具。"
+echo "推送代码到 GitHub 后，树莓派每 5 分钟自动拉取并重启服务。"
