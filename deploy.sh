@@ -4,7 +4,7 @@ set -euo pipefail
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cd "$BASE_DIR"
-git pull origin main
+git pull origin master
 
 source .venv/bin/activate
 pip install -r requirements.txt
