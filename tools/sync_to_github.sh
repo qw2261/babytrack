@@ -2,13 +2,14 @@
 set -euo pipefail
 
 # ============================================================
-# 配置：替换为你的 GitHub Pages 仓库地址
+# 配置：GitHub Pages 仓库（个人站点）
 # ============================================================
-PAGES_REPO_URL="${PAGES_REPO_URL:-git@github.com:YOU/babytrack-pages.git}"
-PAGES_REPO_BRANCH="${PAGES_REPO_BRANCH:-main}"
+PAGES_REPO_URL="${PAGES_REPO_URL:-git@github.com:qw2261/qw2261.github.io.git}"
+PAGES_REPO_BRANCH="${PAGES_REPO_BRANCH:-master}"
+SUBDIR="babytrack"
 
 BASE_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-PAGES_DIR="$BASE_DIR/../babytrack-pages"
+PAGES_DIR="$BASE_DIR/../qw2261.github.io"
 DATE_STR=$(date +'%Y-%m-%d %H:%M')
 
 # ---- Step 1: 准备 Pages repo 本地目录 -----------------------
@@ -25,23 +26,25 @@ else
 fi
 
 # ---- Step 2: 生成 snapshot.json ----------------------------
+DEST_DIR="$PAGES_DIR/$SUBDIR"
+mkdir -p "$DEST_DIR/data"
 cd "$BASE_DIR"
 source .venv/bin/activate
-python tools/export_snapshot.py "$PAGES_DIR/data"
+python tools/export_snapshot.py "$DEST_DIR/data"
 
 # ---- Step 3: 复制静态文件到 Pages 仓库 -----------------------
-cp docs/index.html "$PAGES_DIR/index.html"
-cp docs/app.js "$PAGES_DIR/app.js"
-cp server/static/css/main.css "$PAGES_DIR/main.css"
+cp docs/index.html "$DEST_DIR/index.html"
+cp docs/app.js "$DEST_DIR/app.js"
+cp server/static/css/main.css "$DEST_DIR/main.css"
 
 # ---- Step 4: 提交并推送 ------------------------------------
 cd "$PAGES_DIR"
 
 if ! git diff --quiet; then
   git add -A
-  git commit -m "sync: $DATE_STR"
+  git commit -m "sync babytrack: $DATE_STR"
   git push origin "$PAGES_REPO_BRANCH"
-  echo ">> 已同步到 GitHub Pages ($PAGES_REPO_URL)"
+  echo ">> 已同步到 GitHub Pages (https://qw2261.github.io/babytrack/)"
 else
   echo ">> 无变更，跳过同步"
 fi
