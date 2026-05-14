@@ -1,6 +1,7 @@
 .venv/
 data/
 docs/data/
+tools/cloudflared
 __pycache__/
 *.pyc
 *.pyo
