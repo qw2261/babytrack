@@ -5,7 +5,7 @@ BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "=== BabyTrack 一键部署 ==="
 
 sudo apt update
-sudo apt install -y python3-venv python3-pip avahi-daemon
+sudo apt install -y python3-venv python3-pip avahi-daemon nginx
 
 cd "$BASE_DIR"
 
@@ -32,9 +32,25 @@ Environment=PYTHONUNBUFFERED=1
 WantedBy=multi-user.target
 SYSTEMD
 
+sudo tee /etc/nginx/sites-available/babytrack > /dev/null <<'NGINX'
+server {
+    listen 80;
+    server_name _;
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+NGINX
+
+sudo ln -sf /etc/nginx/sites-available/babytrack /etc/nginx/sites-enabled/babytrack
+sudo rm -f /etc/nginx/sites-enabled/default
+
 sudo systemctl daemon-reload
 sudo systemctl enable babytrack
 sudo systemctl restart babytrack
+sudo systemctl restart nginx
 
 # ---- 定时自动更新（每 5 分钟） -----------------------------
 CRON_JOB="*/5 * * * * cd $BASE_DIR && bash deploy.sh >> /tmp/babytrack-deploy.log 2>&1"
@@ -46,8 +62,8 @@ fi
 
 echo ""
 echo "=== 局域网访问 ==="
-echo "http://babytrack.local:5000"
-echo "http://$(hostname -I | awk '{print $1}'):5000"
+echo "http://babytrack.local"
+echo "http://$(hostname -I | awk '{print $1}')"
 echo ""
 echo "=== 部署完成 ==="
 echo "局域网内手机浏览器打开以上地址即可使用。"
