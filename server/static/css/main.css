@@ -795,3 +795,134 @@ input {
   color: #e06060;
   font-weight: 600;
 }
+
+.week-arrow {
+  width: 24px;
+  height: 100%;
+  font-size: 20px;
+  color: #c8a0b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.week-arrow.disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.date-jump-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 8px;
+}
+
+.date-jump-label {
+  font-size: 11px;
+  color: #c8a0b8;
+}
+
+.date-jump-input {
+  font-size: 11px;
+  color: #c8a0b8;
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  border-radius: 8px;
+  outline: none;
+  width: auto;
+  max-width: 120px;
+  text-align: right;
+  -webkit-appearance: none;
+}
+
+.date-jump-input:focus {
+  background: #f8f0f5;
+}
+
+.date-jump-input::-webkit-calendar-picker-indicator {
+  opacity: 0.4;
+  cursor: pointer;
+}
+
+.onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(135deg, #f8e8f0, #f0e0f8, #e8f0f8);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.onboarding-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 8px 32px rgba(180, 120, 160, 0.15);
+  text-align: center;
+  animation: confirmPop 0.3s ease-out;
+}
+
+.onboarding-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.onboarding-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #d4548a;
+  margin-bottom: 8px;
+}
+
+.onboarding-desc {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 24px;
+}
+
+.onboarding-date-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e0d8e0;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  color: #333;
+  background: #fdfafd;
+  -webkit-appearance: none;
+}
+
+.onboarding-date-input:focus {
+  border-color: #d4548a;
+}
+
+.onboarding-error {
+  font-size: 12px;
+  color: #e06060;
+  margin-bottom: 12px;
+}
+
+.btn-onboarding-submit {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #e87c9e, #d4548a);
+  margin-top: 8px;
+  transition: opacity 0.15s;
+}
+
+.btn-onboarding-submit:active {
+  opacity: 0.85;
+}

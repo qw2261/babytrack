@@ -272,7 +272,17 @@ const WheelPicker = {
 const App = {
   components: { WheelPicker },
   setup() {
-    const babyName = ref(localStorage.getItem('babytrack:babyName') || '鱼宝');
+    const STORED_NAME = localStorage.getItem('babytrack:babyName') || '';
+    const STORED_BIRTH = localStorage.getItem('babytrack:babyBirth') || '';
+
+    const babyName = ref(STORED_NAME || '鱼宝');
+    const babyBirthDate = ref(STORED_BIRTH);
+    const showOnboarding = ref(!STORED_NAME || !STORED_BIRTH);
+
+    const onboardingName = ref(STORED_NAME || '');
+    const onboardingBirth = ref(STORED_BIRTH);
+    const onboardingError = ref('');
+
     const showNameEdit = ref(false);
     const babyNameInput = ref(babyName.value);
     const selectedDate = ref(localDateStr(new Date()));
@@ -295,12 +305,36 @@ const App = {
 
     const confirm = confirmState;
 
+    const todayStr = computed(() => localDateStr(new Date()));
+
     const weekDates = computed(() => getWeekDates(selectedDate.value));
+
+    const canGoPrev = computed(() => {
+      if (!babyBirthDate.value) return false;
+      const mon = new Date(selectedDate.value + 'T00:00:00');
+      const day = mon.getDay();
+      const offset = day === 0 ? -6 : 1 - day;
+      mon.setDate(mon.getDate() + offset);
+      return localDateStr(mon) > babyBirthDate.value;
+    });
+
+    const canGoNext = computed(() => {
+      const mon = new Date(selectedDate.value + 'T00:00:00');
+      const day = mon.getDay();
+      const offset = day === 0 ? -6 : 1 - day;
+      mon.setDate(mon.getDate() + offset);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      return localDateStr(sun) < todayStr.value;
+    });
 
     const monthDayLabel = computed(() => {
       const d = new Date(selectedDate.value + 'T00:00:00');
       return `${d.getMonth() + 1}月${d.getDate()}日`;
     });
+
+    const datePickerMin = computed(() => babyBirthDate.value || '2020-01-01');
+    const datePickerMax = computed(() => todayStr.value);
 
     const tempDisplay = computed({
       get: () => {
@@ -428,6 +462,33 @@ const App = {
       selectedDate.value = localDateStr(new Date());
     }
 
+    function goPrevWeek() {
+      const d = new Date(selectedDate.value + 'T00:00:00');
+      d.setDate(d.getDate() - 7);
+      const ds = localDateStr(d);
+      if (babyBirthDate.value && ds < babyBirthDate.value) {
+        selectedDate.value = babyBirthDate.value;
+      } else {
+        selectedDate.value = ds;
+      }
+    }
+
+    function goNextWeek() {
+      const d = new Date(selectedDate.value + 'T00:00:00');
+      d.setDate(d.getDate() + 7);
+      const ds = localDateStr(d);
+      if (ds > todayStr.value) {
+        selectedDate.value = todayStr.value;
+      } else {
+        selectedDate.value = ds;
+      }
+    }
+
+    function jumpDate(e) {
+      const val = e.target.value;
+      if (val) selectedDate.value = val;
+    }
+
     watch(selectedDate, () => {
       fetchEvents();
       fetchSummary();
@@ -437,7 +498,7 @@ const App = {
       form.value = {
         id: null,
         type: type,
-        start_time: nowLocalISO(),
+        start_time: selectedDate.value + 'T' + nowLocalISO().slice(11),
         end_time: '',
         amount: null,
         sub_type: type === 'diaper' ? 'pee' : null,
@@ -609,6 +670,24 @@ const App = {
       showNameEdit.value = false;
     }
 
+    function saveOnboarding() {
+      const name = onboardingName.value.trim();
+      const birth = onboardingBirth.value.trim();
+      if (!name) { onboardingError.value = '请输入宝宝昵称'; return; }
+      if (!birth) { onboardingError.value = '请选择出生日期'; return; }
+      babyName.value = name;
+      babyBirthDate.value = birth;
+      localStorage.setItem('babytrack:babyName', name);
+      localStorage.setItem('babytrack:babyBirth', birth);
+      document.title = `${name} · BabyTrack`;
+      showOnboarding.value = false;
+      selectedDate.value = localDateStr(new Date());
+      nextTick(() => {
+        fetchEvents();
+        fetchSummary();
+      });
+    }
+
     function confirmReject() {
       if (_confirmReject) {
         _confirmReject(new Error('cancelled'));
@@ -628,27 +707,32 @@ const App = {
     }
 
     onMounted(() => {
-      document.title = `${babyName.value} · BabyTrack`;
-      fetchEvents();
-      fetchSummary();
+      if (!showOnboarding.value) {
+        document.title = `${babyName.value} · BabyTrack`;
+        fetchEvents();
+        fetchSummary();
+      }
       setInterval(() => {
         events.value = [...events.value];
       }, 60000);
     });
 
     return {
-      babyName, showNameEdit, babyNameInput, selectedDate,
+      babyName, babyBirthDate, showOnboarding,
+      onboardingName, onboardingBirth, onboardingError,
+      showNameEdit, babyNameInput, selectedDate,
       events, summary, modal, showMorePanel, showEndPicker,
       form, confirm,
-      weekDates, monthDayLabel,
+      todayStr, weekDates, canGoPrev, canGoNext,
+      monthDayLabel, datePickerMin, datePickerMax,
       tempDisplay, modalTitle, submitLabel,
       quickAmounts, diaperColors,
       formatTime, timeAgo, typeColor, typeLabel,
       isOngoing, ongoingLabel, eventDetail, formatDateTime,
-      selectDate, goToday,
+      selectDate, goToday, goPrevWeek, goNextWeek, jumpDate,
       openModal, openEdit, closeModal, submitForm,
       handleSleep, handleBath, endOngoing, handleVitamin,
-      confirmDelete, saveBabyName,
+      confirmDelete, saveBabyName, saveOnboarding,
       confirmReject, confirmResolve,
     };
   },

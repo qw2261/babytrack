@@ -9,7 +9,38 @@
 <body>
 <div id="app" v-cloak>
   {% raw %}
-  <div class="header">
+  <div v-if="showOnboarding" class="onboarding-overlay">
+    <div class="onboarding-card">
+      <div class="onboarding-icon">👶</div>
+      <h2 class="onboarding-title">欢迎使用 BabyTrack</h2>
+      <p class="onboarding-desc">请先填写宝宝信息，开始记录成长点滴</p>
+
+      <div class="form-group">
+        <label class="form-label">宝宝昵称</label>
+        <input
+          class="note-input"
+          v-model="onboardingName"
+          placeholder="如：鱼宝"
+        >
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">出生日期</label>
+        <input
+          class="onboarding-date-input"
+          type="date"
+          v-model="onboardingBirth"
+          :max="todayStr"
+        >
+      </div>
+
+      <p v-if="onboardingError" class="onboarding-error">{{ onboardingError }}</p>
+
+      <button class="btn-onboarding-submit" @click="saveOnboarding">开始使用</button>
+    </div>
+  </div>
+
+  <div class="header" v-if="!showOnboarding">
     <div class="header-top">
       <div class="baby-name" @click="showNameEdit = true">
         {{ babyName }}<span class="baby-name-edit"> ✎</span>
@@ -19,6 +50,7 @@
       </div>
     </div>
     <div class="week-row">
+      <button class="week-arrow" :class="{ disabled: !canGoPrev }" @click="goPrevWeek" :disabled="!canGoPrev">‹</button>
       <div
         v-for="d in weekDates"
         :key="d.dateStr"
@@ -29,11 +61,22 @@
         <div class="date-weekday">{{ d.weekday }}</div>
         <div class="date-day">{{ d.day }}</div>
       </div>
-      <div class="date-month-label">{{ monthDayLabel }}</div>
+      <button class="week-arrow" :class="{ disabled: !canGoNext }" @click="goNextWeek" :disabled="!canGoNext">›</button>
+    </div>
+    <div class="date-jump-row">
+      <span class="date-jump-label">{{ monthDayLabel }}</span>
+      <input
+        class="date-jump-input"
+        type="date"
+        :value="selectedDate"
+        :min="datePickerMin"
+        :max="datePickerMax"
+        @change="jumpDate"
+      >
     </div>
   </div>
 
-  <div class="summary-bar" v-if="summary">
+  <div class="summary-bar" v-if="summary && !showOnboarding">
     <div class="summary-item" v-if="summary.feed && summary.feed.count > 0">
       <span class="label">喂奶</span>
       <span class="value">{{ summary.feed.count }}次 {{ summary.feed.total_ml }}ml</span>
@@ -64,7 +107,7 @@
     </div>
   </div>
 
-  <div class="timeline">
+  <div class="timeline" v-if="!showOnboarding">
     <div v-if="events.length === 0" class="empty-state">
       <div class="empty-icon">📝</div>
       <div class="empty-text">今天还没有记录</div>
@@ -98,7 +141,7 @@
     </div>
   </div>
 
-  <div class="bottom-actions">
+  <div class="bottom-actions" v-if="!showOnboarding">
     <div class="action-btn" @click="openModal('feed')">
       <div class="action-icon" style="background: #fde8f0; color: #e87c9e;">🍼</div>
       <div class="action-label">喂奶</div>
@@ -155,7 +198,7 @@
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">开始时间</label>
-          <wheel-picker v-model="form.start_time" :min-date="minDate" :max-date="maxDate"></wheel-picker>
+          <wheel-picker v-model="form.start_time"></wheel-picker>
         </div>
 
         <div v-if="(modal === 'edit' && (form.type === 'sleep' || form.type === 'bath')) || modal === 'start'" class="form-group">
@@ -164,7 +207,7 @@
             {{ form.end_time ? formatDateTime(form.end_time) : '熟睡中（点击设置结束时间）' }}
           </div>
           <div v-else>
-            <wheel-picker v-model="form.end_time" :min-date="minDate" :max-date="maxDate"></wheel-picker>
+            <wheel-picker v-model="form.end_time"></wheel-picker>
             <button v-if="form.end_time" class="btn-clear-end" @click="form.end_time = ''; showEndPicker = false">清除（恢复进行中）</button>
           </div>
         </div>
@@ -292,6 +335,6 @@
 </div>
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script src="/static/js/app.js?v=2"></script>
+<script src="/static/js/app.js?v=3"></script>
 </body>
 </html>
