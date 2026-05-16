@@ -22,7 +22,7 @@ Description=BabyTrack Flask App
 After=network.target
 
 [Service]
-User=pi
+User=$USER
 WorkingDirectory=$BASE_DIR
 ExecStart=$BASE_DIR/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5000 run:app
 Restart=always
