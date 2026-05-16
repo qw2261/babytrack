@@ -204,7 +204,7 @@
         <div v-if="(modal === 'edit' && (form.type === 'sleep' || form.type === 'bath')) || modal === 'start'" class="form-group">
           <label class="form-label">结束时间</label>
           <div v-if="!showEndPicker" class="end-time-placeholder" @click="showEndPicker = true">
-            {{ form.end_time ? formatDateTime(form.end_time) : '熟睡中（点击设置结束时间）' }}
+            {{ form.end_time ? formatDateTime(form.end_time) : (form.type === 'sleep' ? '熟睡中（点击设置结束时间）' : '洗澡中（点击设置结束时间）') }}
           </div>
           <div v-else>
             <wheel-picker v-model="form.end_time"></wheel-picker>
@@ -335,6 +335,6 @@
 </div>
 
 <script src="/static/js/vue.global.prod.js"></script>
-<script src="/static/js/app.js?v=3"></script>
+<script src="/static/js/app.js?v=4"></script>
 </body>
 </html>
