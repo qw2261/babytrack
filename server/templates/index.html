@@ -136,7 +136,7 @@
         <span class="event-detail">{{ eventDetail(event) }}</span>
       </div>
       <div v-if="isOngoing(event)" class="event-actions">
-        <button class="btn-end-sleep" @click.stop="endOngoing(event)">记录睡醒</button>
+        <button class="btn-end-sleep" @click.stop="endOngoing(event)">{{ event.type === 'sleep' ? '记录睡醒' : '记录结束' }}</button>
       </div>
     </div>
   </div>
