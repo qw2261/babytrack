@@ -4,18 +4,11 @@ set -euo pipefail
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cd "$BASE_DIR"
-
-BEFORE=$(git rev-parse HEAD)
-git pull origin master --quiet
-AFTER=$(git rev-parse HEAD)
-
-if [ "$BEFORE" = "$AFTER" ]; then
-  exit 0
-fi
+git pull origin master
 
 source .venv/bin/activate
-pip install -r requirements.txt --quiet
+pip install -r requirements.txt
 
 sudo systemctl restart babytrack
 
-echo "[$(date '+%Y-%m-%d %H:%M')] Updated to $AFTER"
+echo "Deploy updated."
