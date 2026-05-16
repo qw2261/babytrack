@@ -1,6 +1,7 @@
 .venv/
 data/
 docs/data/
+operation.md
 __pycache__/
 *.pyc
 *.pyo
