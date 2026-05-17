@@ -6,7 +6,7 @@ BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$BASE_DIR"
 
 BEFORE=$(git rev-parse HEAD)
-git pull origin master --quiet
+git -c http.version=HTTP/1.1 pull origin master --quiet
 AFTER=$(git rev-parse HEAD)
 
 if [ "$BEFORE" = "$AFTER" ]; then
