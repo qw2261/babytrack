@@ -926,3 +926,86 @@ input {
 .btn-onboarding-submit:active {
   opacity: 0.85;
 }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-tab {
+  font-size: 14px;
+  color: #c8a0b8;
+  padding: 4px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-tab:hover {
+  background: #f5e8f0;
+  color: #d474a0;
+}
+
+.nav-tab.active {
+  background: #e8a0c8;
+  color: #fff;
+}
+
+.stats-view {
+  padding: 16px;
+  padding-bottom: 120px;
+}
+
+.stats-header {
+  margin-bottom: 16px;
+}
+
+.period-tabs {
+  display: flex;
+  gap: 8px;
+  background: #f5eff5;
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.period-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px 0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #999;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.period-tab:hover {
+  color: #777;
+}
+
+.period-tab.active {
+  background: #fff;
+  color: #d4548a;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.chart-container {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.chart-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #555;
+  margin-bottom: 12px;
+}
+
+.chart-container canvas {
+  max-height: 200px;
+}

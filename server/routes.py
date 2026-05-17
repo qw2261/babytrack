@@ -149,3 +149,134 @@ def summary(date):
             result['temperature']['count'] += 1
 
     return jsonify(result)
+
+
+@bp.route('/api/summary/week/<date>')
+def weekly_summary(date):
+    d = datetime.strptime(date, '%Y-%m-%d').date()
+    monday = d - timedelta(days=d.weekday())
+    start = datetime.combine(monday, datetime.min.time())
+    end = start + timedelta(days=7)
+
+    events = Event.query.filter(
+        Event.start_time >= start,
+        Event.start_time < end
+    ).all()
+
+    daily_data = {}
+    for i in range(7):
+        day_date = (monday + timedelta(days=i)).isoformat()
+        daily_data[day_date] = {
+            'feed': {'count': 0, 'total_ml': 0},
+            'sleep': {'count': 0, 'total_minutes': 0},
+            'diaper': {'count': 0},
+            'bath': {'count': 0, 'total_minutes': 0},
+            'food': {'count': 0},
+            'temperature': {'count': 0, 'values': []},
+        }
+
+    for e in events:
+        day_date = e.start_time.date().isoformat()
+        if day_date not in daily_data:
+            continue
+        data = daily_data[day_date]
+        t = e.type
+        if t == 'feed':
+            data['feed']['count'] += 1
+            if e.amount:
+                data['feed']['total_ml'] += e.amount
+        elif t == 'sleep':
+            data['sleep']['count'] += 1
+            if e.end_time:
+                delta = e.end_time - e.start_time
+                data['sleep']['total_minutes'] += int(delta.total_seconds() / 60)
+        elif t == 'diaper':
+            data['diaper']['count'] += 1
+        elif t == 'bath':
+            data['bath']['count'] += 1
+            if e.end_time:
+                delta = e.end_time - e.start_time
+                data['bath']['total_minutes'] += int(delta.total_seconds() / 60)
+        elif t == 'food':
+            data['food']['count'] += 1
+        elif t == 'temperature':
+            data['temperature']['count'] += 1
+            if e.amount is not None:
+                data['temperature']['values'].append(e.amount / 10)
+
+    result = {
+        'start_date': monday.isoformat(),
+        'end_date': (monday + timedelta(days=6)).isoformat(),
+        'daily': daily_data,
+    }
+    return jsonify(result)
+
+
+@bp.route('/api/summary/month/<year>/<month>')
+def monthly_summary(year, month):
+    start = datetime(int(year), int(month), 1)
+    if start.month == 12:
+        end = datetime(int(year) + 1, 1, 1)
+    else:
+        end = datetime(int(year), int(month) + 1, 1)
+
+    events = Event.query.filter(
+        Event.start_time >= start,
+        Event.start_time < end
+    ).all()
+
+    daily_data = {}
+    num_days = (end - start).days
+    for i in range(num_days):
+        day_date = (start + timedelta(days=i)).date().isoformat()
+        daily_data[day_date] = {
+            'feed': {'count': 0, 'total_ml': 0},
+            'sleep': {'count': 0, 'total_minutes': 0},
+            'diaper': {'count': 0},
+            'bath': {'count': 0, 'total_minutes': 0},
+            'food': {'count': 0},
+            'temperature': {'count': 0, 'avg': None},
+        }
+
+    temp_totals = {}
+    for e in events:
+        day_date = e.start_time.date().isoformat()
+        if day_date not in daily_data:
+            continue
+        data = daily_data[day_date]
+        t = e.type
+        if t == 'feed':
+            data['feed']['count'] += 1
+            if e.amount:
+                data['feed']['total_ml'] += e.amount
+        elif t == 'sleep':
+            data['sleep']['count'] += 1
+            if e.end_time:
+                delta = e.end_time - e.start_time
+                data['sleep']['total_minutes'] += int(delta.total_seconds() / 60)
+        elif t == 'diaper':
+            data['diaper']['count'] += 1
+        elif t == 'bath':
+            data['bath']['count'] += 1
+            if e.end_time:
+                delta = e.end_time - e.start_time
+                data['bath']['total_minutes'] += int(delta.total_seconds() / 60)
+        elif t == 'food':
+            data['food']['count'] += 1
+        elif t == 'temperature':
+            data['temperature']['count'] += 1
+            if day_date not in temp_totals:
+                temp_totals[day_date] = []
+            if e.amount is not None:
+                temp_totals[day_date].append(e.amount / 10)
+
+    for day_date, temps in temp_totals.items():
+        if temps:
+            daily_data[day_date]['temperature']['avg'] = sum(temps) / len(temps)
+
+    result = {
+        'year': int(year),
+        'month': int(month),
+        'daily': daily_data,
+    }
+    return jsonify(result)

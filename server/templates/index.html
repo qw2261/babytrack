@@ -46,6 +46,8 @@
         {{ babyName }}<span class="baby-name-edit"> ✎</span>
       </div>
       <div class="header-actions">
+        <span class="nav-tab" :class="{active: currentView === 'home'}" @click="currentView = 'home'">记录</span>
+        <span class="nav-tab" :class="{active: currentView === 'stats'}" @click="currentView = 'stats'">统计</span>
         <span class="today-label" @click="goToday">今</span>
       </div>
     </div>
@@ -138,6 +140,31 @@
       <div v-if="isOngoing(event)" class="event-actions">
         <button class="btn-end-sleep" @click.stop="endOngoing(event)">{{ event.type === 'sleep' ? '记录睡醒' : '记录结束' }}</button>
       </div>
+    </div>
+  </div>
+
+  <div class="stats-view" v-if="!showOnboarding && currentView === 'stats'">
+    <div class="stats-header">
+      <div class="period-tabs">
+        <span class="period-tab" :class="{active: statsPeriod === 'week'}" @click="statsPeriod = 'week'">本周</span>
+        <span class="period-tab" :class="{active: statsPeriod === 'month'}" @click="statsPeriod = 'month'">本月</span>
+      </div>
+    </div>
+    <div class="chart-container">
+      <h3 class="chart-title">睡眠时长</h3>
+      <canvas ref="sleepChartRef"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3 class="chart-title">喂奶量</h3>
+      <canvas ref="feedChartRef"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3 class="chart-title">尿布次数</h3>
+      <canvas ref="diaperChartRef"></canvas>
+    </div>
+    <div class="chart-container">
+      <h3 class="chart-title">体温记录</h3>
+      <canvas ref="tempChartRef"></canvas>
     </div>
   </div>
 
@@ -335,6 +362,7 @@
 </div>
 
 <script src="/static/js/vue.global.prod.js"></script>
-<script src="/static/js/app.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/static/js/app.js?v=5"></script>
 </body>
 </html>

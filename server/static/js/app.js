@@ -291,6 +291,19 @@ const App = {
     const modal = ref(null);
     const showMorePanel = ref(false);
     const showEndPicker = ref(false);
+    
+    const currentView = ref('home');
+    const statsPeriod = ref('week');
+    
+    const sleepChartRef = ref(null);
+    const feedChartRef = ref(null);
+    const diaperChartRef = ref(null);
+    const tempChartRef = ref(null);
+    
+    let sleepChart = null;
+    let feedChart = null;
+    let diaperChart = null;
+    let tempChart = null;
 
     const form = ref({
       id: null,
@@ -706,6 +719,126 @@ const App = {
       confirm.show = false;
     }
 
+    function formatDayLabel(isoDate) {
+      const d = new Date(isoDate);
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+      return `${month}/${day} 周${weekdays[d.getDay()]}`;
+    }
+    
+    function formatDayLabelShort(isoDate) {
+      const d = new Date(isoDate);
+      const month = d.getMonth() + 1;
+      const day = d.getDate();
+      return `${month}/${day}`;
+    }
+    
+    function initCharts() {
+      if (sleepChart) sleepChart.destroy();
+      if (feedChart) feedChart.destroy();
+      if (diaperChart) diaperChart.destroy();
+      if (tempChart) tempChart.destroy();
+      
+      if (sleepChartRef.value) {
+        sleepChart = new Chart(sleepChartRef.value, {
+          type: 'line',
+          data: { labels: [], datasets: [{ label: '睡眠(小时)', data: [], borderColor: '#7eb8e0', backgroundColor: 'rgba(126, 184, 224, 0.1)', fill: true, tension: 0.3 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+      }
+      
+      if (feedChartRef.value) {
+        feedChart = new Chart(feedChartRef.value, {
+          type: 'bar',
+          data: { labels: [], datasets: [{ label: '喂奶(ml)', data: [], backgroundColor: 'rgba(232, 124, 158, 0.7)' }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+      }
+      
+      if (diaperChartRef.value) {
+        diaperChart = new Chart(diaperChartRef.value, {
+          type: 'line',
+          data: { labels: [], datasets: [{ label: '尿布次数', data: [], borderColor: '#a0d4a0', backgroundColor: 'rgba(160, 212, 160, 0.1)', fill: true, tension: 0.3 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+      }
+      
+      if (tempChartRef.value) {
+        tempChart = new Chart(tempChartRef.value, {
+          type: 'line',
+          data: { labels: [], datasets: [{ label: '体温(°C)', data: [], borderColor: '#e06060', backgroundColor: 'rgba(224, 96, 96, 0.1)', fill: true, tension: 0.3 }] },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 36, max: 38 } } }
+        });
+      }
+    }
+    
+    async function fetchStatsData() {
+      let url;
+      const now = new Date();
+      if (statsPeriod.value === 'week') {
+        url = `/api/summary/week/${localDateStr(now)}`;
+      } else {
+        url = `/api/summary/month/${now.getFullYear()}/${now.getMonth() + 1}`;
+      }
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      updateCharts(data);
+    }
+    
+    function updateCharts(data) {
+      const labels = [];
+      const sleepData = [];
+      const feedData = [];
+      const diaperData = [];
+      const tempData = [];
+      
+      const sortedDays = Object.keys(data.daily).sort();
+      const labelFormat = statsPeriod.value === 'week' ? formatDayLabel : formatDayLabelShort;
+      
+      sortedDays.forEach(day => {
+        const dayData = data.daily[day];
+        labels.push(labelFormat(day));
+        sleepData.push(dayData.sleep.total_minutes / 60);
+        feedData.push(dayData.feed.total_ml);
+        diaperData.push(dayData.diaper.count);
+        
+        if (statsPeriod.value === 'week' && dayData.temperature.values.length > 0) {
+          const avg = dayData.temperature.values.reduce((a, b) => a + b, 0) / dayData.temperature.values.length;
+          tempData.push(avg);
+        } else if (statsPeriod.value === 'month' && dayData.temperature.avg !== null) {
+          tempData.push(dayData.temperature.avg);
+        } else {
+          tempData.push(null);
+        }
+      });
+      
+      if (sleepChart) {
+        sleepChart.data.labels = labels;
+        sleepChart.data.datasets[0].data = sleepData;
+        sleepChart.update();
+      }
+      
+      if (feedChart) {
+        feedChart.data.labels = labels;
+        feedChart.data.datasets[0].data = feedData;
+        feedChart.update();
+      }
+      
+      if (diaperChart) {
+        diaperChart.data.labels = labels;
+        diaperChart.data.datasets[0].data = diaperData;
+        diaperChart.update();
+      }
+      
+      if (tempChart) {
+        tempChart.data.labels = labels;
+        tempChart.data.datasets[0].data = tempData;
+        tempChart.update();
+      }
+    }
+
     onMounted(() => {
       if (!showOnboarding.value) {
         document.title = `${babyName.value} · BabyTrack`;
@@ -716,12 +849,29 @@ const App = {
         events.value = [...events.value];
       }, 60000);
     });
+    
+    watch(currentView, (newVal) => {
+      if (newVal === 'stats') {
+        nextTick(() => {
+          initCharts();
+          fetchStatsData();
+        });
+      }
+    });
+    
+    watch(statsPeriod, () => {
+      if (currentView.value === 'stats') {
+        fetchStatsData();
+      }
+    });
 
     return {
       babyName, babyBirthDate, showOnboarding,
       onboardingName, onboardingBirth, onboardingError,
       showNameEdit, babyNameInput, selectedDate,
       events, summary, modal, showMorePanel, showEndPicker,
+      currentView, statsPeriod,
+      sleepChartRef, feedChartRef, diaperChartRef, tempChartRef,
       form, confirm,
       todayStr, weekDates, canGoPrev, canGoNext,
       monthDayLabel, datePickerMin, datePickerMax,
