@@ -6,7 +6,14 @@ BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$BASE_DIR"
 
 BEFORE=$(git rev-parse HEAD)
-git -c http.version=HTTP/1.1 pull origin master --quiet
+
+for i in 1 2 3; do
+  if git -c http.version=HTTP/1.1 pull origin master --quiet 2>/dev/null; then
+    break
+  fi
+  sleep 30
+done
+
 AFTER=$(git rev-parse HEAD)
 
 if [ "$BEFORE" = "$AFTER" ]; then
