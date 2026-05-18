@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>BabyTrack (只读快照)</title>
+  <link rel="stylesheet" href="./main.css">
+</head>
+<body>
+<div id="app" v-cloak>
+  <div class="snapshot-banner">
+    <span>只读快照</span>
+    <span class="snapshot-time" v-if="snapshotTime">{{ snapshotTime }}</span>
+  </div>
+
+  <div class="header">
+    <div class="header-top">
+      <div class="baby-name">{{ babyName }}</div>
+      <div class="header-actions">
+        <span class="today-label" @click="goToday">今</span>
+      </div>
+    </div>
+    <div class="week-row">
+      <button class="week-arrow" :class="{ disabled: !canGoPrev }" @click="goPrevWeek" :disabled="!canGoPrev">‹</button>
+      <div
+        v-for="d in weekDates"
+        :key="d.dateStr"
+        class="date-item"
+        :class="{ active: d.dateStr === selectedDate }"
+        @click="selectDate(d.dateStr)"
+      >
+        <div class="date-weekday">{{ d.weekday }}</div>
+        <div class="date-day">{{ d.day }}</div>
+      </div>
+      <button class="week-arrow" :class="{ disabled: !canGoNext }" @click="goNextWeek" :disabled="!canGoNext">›</button>
+    </div>
+    <div class="date-jump-row">
+      <span class="date-jump-label">{{ monthDayLabel }}</span>
+    </div>
+  </div>
+
+  <div class="summary-bar" v-if="summary">
+    <div class="summary-item" v-if="summary.feed && summary.feed.count > 0">
+      <span class="label">喂奶</span>
+      <span class="value">{{ summary.feed.count }}次 {{ summary.feed.total_ml }}ml</span>
+    </div>
+    <div class="summary-item" v-if="summary.diaper && summary.diaper.count > 0">
+      <span class="label">尿布</span>
+      <span class="value">{{ summary.diaper.count }}次</span>
+    </div>
+    <div class="summary-item" v-if="summary.vitamin && summary.vitamin.taken">
+      <span class="label">维生素AD</span>
+      <span class="value">✓</span>
+    </div>
+    <div class="summary-item" v-if="summary.sleep && summary.sleep.count > 0">
+      <span class="label">睡眠</span>
+      <span class="value">{{ summary.sleep.count }}次</span>
+    </div>
+    <div class="summary-item" v-if="summary.bath && summary.bath.count > 0">
+      <span class="label">洗澡</span>
+      <span class="value">{{ summary.bath.count }}次</span>
+    </div>
+    <div class="summary-item" v-if="summary.food && summary.food.count > 0">
+      <span class="label">辅食</span>
+      <span class="value">{{ summary.food.count }}次</span>
+    </div>
+    <div class="summary-item" v-if="summary.temperature && summary.temperature.count > 0">
+      <span class="label">体温</span>
+      <span class="value">{{ summary.temperature.count }}次</span>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div v-if="filteredEvents.length === 0" class="empty-state">
+      <div class="empty-icon">📝</div>
+      <div class="empty-text">暂无记录</div>
+    </div>
+    <div
+      v-for="event in filteredEvents"
+      :key="event.id"
+      class="event-card"
+      :class="{ 'sleep-ongoing': isOngoing(event), 'bath-ongoing': isOngoing(event) && event.type === 'bath' }"
+    >
+      <div class="event-header">
+        <div class="event-header-left">
+          <span class="event-dot" :style="{ background: typeColor(event.type) }"></span>
+          <span class="event-time">{{ formatTime(event.start_time) }}</span>
+          <span v-if="isOngoing(event)" class="ongoing-badge">{{ ongoingLabel(event) }}</span>
+        </div>
+        <div class="event-header-right">
+          <span class="event-ago">{{ timeAgo(event.start_time) }}</span>
+        </div>
+      </div>
+      <div class="event-body">
+        <span class="event-type-label">{{ typeLabel(event.type) }}</span>
+        <span class="event-detail">{{ eventDetail(event) }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const { createApp, ref, computed, watch, onMounted } = Vue;
+
+function nowLocalISO() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function localDateStr(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function timeAgo(iso) {
+  const ms = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return '刚刚';
+  if (min < 60) return `${min}分钟前`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}小时前`;
+  return `${Math.floor(h / 24)}天前`;
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const TYPE_CONFIG = {
+  feed: { label: '喂奶', color: '#e87c9e', icon: '🍼' },
+  sleep: { label: '睡眠', color: '#7eb8e0', icon: '💤' },
+  diaper: { label: '尿布', color: '#a0d4a0', icon: '🧷' },
+  vitamin: { label: '维生素AD', color: '#e8c86e', icon: '💊' },
+  bath: { label: '洗澡', color: '#88c8e8', icon: '🛁' },
+  food: { label: '辅食', color: '#f0a860', icon: '🍜' },
+  checkup: { label: '体检', color: '#b088d0', icon: '🏥' },
+  temperature: { label: '体温', color: '#e06060', icon: '🌡️' },
+};
+
+const WEEKDAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+function getWeekDates(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + mondayOffset);
+
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(monday);
+    cur.setDate(monday.getDate() + i);
+    dates.push({
+      dateStr: localDateStr(cur),
+      weekday: WEEKDAY_NAMES[i],
+      day: cur.getDate(),
+      month: cur.getMonth() + 1,
+    });
+  }
+  return dates;
+}
+
+const App = {
+  setup() {
+    const babyName = ref(localStorage.getItem('babytrack:babyName') || '鱼宝');
+    const selectedDate = ref(localDateStr(new Date()));
+    const allEvents = ref([]);
+    const exportedAt = ref(null);
+
+    const filteredEvents = computed(() => {
+      return allEvents.value.filter(e => {
+        const date = localDateStr(new Date(e.start_time));
+        return date === selectedDate.value;
+      });
+    });
+
+    const summary = computed(() => {
+      const events = filteredEvents.value;
+      const result = {
+        feed: { count: 0, total_ml: 0 },
+        sleep: { count: 0, total_minutes: 0 },
+        diaper: { count: 0, pee: 0, poop: 0 },
+        vitamin: { taken: false },
+        bath: { count: 0, total_minutes: 0 },
+        food: { count: 0 },
+        checkup: { count: 0 },
+        temperature: { count: 0 },
+      };
+
+      for (const e of events) {
+        const t = e.type;
+        if (t === 'feed') {
+          result.feed.count++;
+          if (e.amount) result.feed.total_ml += e.amount;
+        } else if (t === 'sleep') {
+          result.sleep.count++;
+          if (e.end_time) {
+            const delta = new Date(e.end_time) - new Date(e.start_time);
+            result.sleep.total_minutes += Math.floor(delta / 60000);
+          }
+        } else if (t === 'diaper') {
+          result.diaper.count++;
+          if (e.sub_type === 'pee') result.diaper.pee++;
+          if (e.sub_type === 'poop') result.diaper.poop++;
+        } else if (t === 'vitamin') {
+          result.vitamin.taken = true;
+        } else if (t === 'bath') {
+          result.bath.count++;
+          if (e.end_time) {
+            const delta = new Date(e.end_time) - new Date(e.start_time);
+            result.bath.total_minutes += Math.floor(delta / 60000);
+          }
+        } else if (t === 'food') {
+          result.food.count++;
+        } else if (t === 'checkup') {
+          result.checkup.count++;
+        } else if (t === 'temperature') {
+          result.temperature.count++;
+        }
+      }
+      return result;
+    });
+
+    const weekDates = computed(() => getWeekDates(selectedDate.value));
+
+    const canGoPrev = computed(() => true);
+    const canGoNext = computed(() => {
+      const mon = new Date(selectedDate.value + 'T00:00:00');
+      const day = mon.getDay();
+      const offset = day === 0 ? -6 : 1 - day;
+      mon.setDate(mon.getDate() + offset);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      return localDateStr(sun) < localDateStr(new Date());
+    });
+
+    const monthDayLabel = computed(() => {
+      const d = new Date(selectedDate.value + 'T00:00:00');
+      return `${d.getMonth() + 1}月${d.getDate()}日`;
+    });
+
+    const snapshotTime = computed(() => {
+      if (!exportedAt.value) return '';
+      const d = new Date(exportedAt.value);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())} 更新`;
+    });
+
+    function typeColor(type) {
+      return TYPE_CONFIG[type]?.color || '#999';
+    }
+
+    function typeLabel(type) {
+      return TYPE_CONFIG[type]?.label || type;
+    }
+
+    function isOngoing(event) {
+      return (event.type === 'sleep' || event.type === 'bath') && !event.end_time;
+    }
+
+    function formatDuration(min) {
+      if (min < 60) return `${min}分钟`;
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      if (m === 0) return `${h}小时`;
+      return `${h}时${m}分`;
+    }
+
+    function ongoingLabel(event) {
+      if (!event.start_time) return '';
+      const ms = Date.now() - new Date(event.start_time).getTime();
+      const min = Math.floor(ms / 60000);
+      if (event.type === 'sleep') return `已睡 ${formatDuration(min)}`;
+      if (event.type === 'bath') return `已洗 ${formatDuration(min)}`;
+      return '';
+    }
+
+    function eventDetail(event) {
+      switch (event.type) {
+        case 'feed':
+          return event.amount ? `${event.amount}ml` : '';
+        case 'sleep':
+          if (event.end_time) {
+            const ms = new Date(event.end_time) - new Date(event.start_time);
+            const min = Math.floor(ms / 60000);
+            return `时长:${formatDuration(min)}`;
+          }
+          return '';
+        case 'diaper': {
+          let parts = [];
+          if (event.sub_type === 'pee') parts.push('嘘嘘');
+          if (event.sub_type === 'poop') parts.push('便便');
+          if (event.color) parts.push(`(${event.color})`);
+          return parts.join(' ');
+        }
+        case 'vitamin':
+          return '✓';
+        case 'bath':
+          if (event.end_time) {
+            const ms = new Date(event.end_time) - new Date(event.start_time);
+            const min = Math.floor(ms / 60000);
+            return `时长:${formatDuration(min)}`;
+          }
+          return '';
+        case 'food': {
+          let parts = [];
+          if (event.amount) parts.push(`${event.amount}ml`);
+          if (event.note) parts.push(event.note);
+          return parts.join(' ');
+        }
+        case 'checkup':
+          return event.note || '';
+        case 'temperature':
+          return event.amount != null ? `${(event.amount / 10).toFixed(1)}°C` : '';
+        default:
+          return '';
+      }
+    }
+
+    function selectDate(dateStr) {
+      selectedDate.value = dateStr;
+    }
+
+    function goToday() {
+      selectedDate.value = localDateStr(new Date());
+    }
+
+    function goPrevWeek() {
+      const d = new Date(selectedDate.value + 'T00:00:00');
+      d.setDate(d.getDate() - 7);
+      selectedDate.value = localDateStr(d);
+    }
+
+    function goNextWeek() {
+      const d = new Date(selectedDate.value + 'T00:00:00');
+      d.setDate(d.getDate() + 7);
+      selectedDate.value = localDateStr(d);
+    }
+
+    async function loadSnapshot() {
+      try {
+        const res = await fetch('./data/snapshot.json');
+        const data = await res.json();
+        allEvents.value = data.events || [];
+        exportedAt.value = data.exported_at || null;
+      } catch (e) {
+        console.error('Failed to load snapshot', e);
+      }
+    }
+
+    onMounted(() => {
+      document.title = `${babyName.value} · BabyTrack`;
+      loadSnapshot();
+      setInterval(() => {
+        allEvents.value = [...allEvents.value];
+      }, 60000);
+    });
+
+    return {
+      babyName,
+      selectedDate,
+      filteredEvents,
+      summary,
+      weekDates,
+      canGoPrev,
+      canGoNext,
+      monthDayLabel,
+      snapshotTime,
+      typeColor,
+      typeLabel,
+      isOngoing,
+      ongoingLabel,
+      eventDetail,
+      formatTime,
+      timeAgo,
+      selectDate,
+      goToday,
+      goPrevWeek,
+      goNextWeek,
+    };
+  },
+};
+
+createApp(App).mount('#app');
+</script>
+<style>
+.snapshot-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #e8f0f8, #f0f8f8);
+  font-size: 12px;
+  color: #7eb8e0;
+}
+.snapshot-time {
+  color: #999;
+}
+</style>
+</body>
+</html>
